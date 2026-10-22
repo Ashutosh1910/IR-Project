@@ -15,6 +15,7 @@ implementation. No prebuilt TF–IDF vectoriser or retrieval library is used.
 | 16 | P@10, R@10, F1@10, MAP | `irengine/metrics.py` |
 | 17 | Queries with no relevant documents | `irengine/metrics.py` (`evaluate`), `run_engine.py evaluate` |
 | 18 | Validation | `docs/validation.md`, `tests/` |
+| 19–24 | Cranfield slope selection and freeze | `docs/cranfield.md`, `run_cranfield.py` |
 
 ## Step 10: preprocessing and index
 
