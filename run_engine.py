@@ -1,11 +1,13 @@
 """Command-line entry point for the retrieval engine.
 
   python run_engine.py stats
-  python run_engine.py search "election commission rules" --s 0.5 --k 10
-  python run_engine.py evaluate --queries queries.json --qrels qrels.csv [--s 0 0.1 ... 1] [--out results/]
+  python run_engine.py search "election commission rules" [--s 0.8] --k 10
+  python run_engine.py evaluate --queries queries.json --qrels qrels.csv [--s ...] [--out results/]
 
 `evaluate` always includes cosine as the baseline and reports queries without
-relevant documents separately (they are excluded from all averages).
+relevant documents separately (they are excluded from all averages). Pivoted
+runs default to the slope frozen on Cranfield (frozen_slope.json, written by
+run_cranfield.py); --s overrides it.
 """
 
 import argparse
@@ -21,6 +23,15 @@ from irengine.metrics import evaluate
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SLOPES = [round(0.1 * i, 1) for i in range(11)]
+FROZEN_SLOPE_PATH = ROOT / "frozen_slope.json"
+
+
+def frozen_slope():
+    """The slope frozen on Cranfield (step 24), or None if run_cranfield.py has not run."""
+    if not FROZEN_SLOPE_PATH.exists():
+        return None
+    with open(FROZEN_SLOPE_PATH, encoding="utf-8") as f:
+        return float(json.load(f)["s"])
 
 
 def build_index(args) -> tuple[InvertedIndex, dict]:
@@ -116,20 +127,24 @@ def main(argv=None):
     parser.add_argument("--no-title", action="store_true", help="index body text only")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    frozen = frozen_slope()
     sub.add_parser("stats", help="collection and index statistics").set_defaults(func=cmd_stats)
 
     p = sub.add_parser("search", help="rank articles for one query")
     p.add_argument("query")
-    p.add_argument("--s", type=float, nargs="*", default=[0.5],
-                   help="pivoted slopes to show next to cosine (0.5 is only a placeholder "
-                        "until the slope is chosen on Cranfield)")
+    p.add_argument("--s", type=float, nargs="*", default=[0.5 if frozen is None else frozen],
+                   help="pivoted slopes to show next to cosine (default: the slope in "
+                        "frozen_slope.json, or 0.5 if it does not exist yet)")
     p.add_argument("--k", type=int, default=10)
     p.set_defaults(func=cmd_search)
 
     p = sub.add_parser("evaluate", help="P@k, R@k, F1@k and MAP for cosine and pivoted")
     p.add_argument("--queries", required=True)
     p.add_argument("--qrels", required=True)
-    p.add_argument("--s", type=float, nargs="*", default=DEFAULT_SLOPES)
+    p.add_argument("--s", type=float, nargs="*",
+                   default=DEFAULT_SLOPES if frozen is None else [frozen],
+                   help="pivoted slopes to evaluate (default: the slope in frozen_slope.json, "
+                        "or 0.0, 0.1, ..., 1.0 if it does not exist yet)")
     p.add_argument("--k", type=int, default=10)
     p.add_argument("--out", help="directory for per_query.csv and summary.json")
     p.set_defaults(func=cmd_evaluate)
