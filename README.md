@@ -38,6 +38,8 @@ irengine/
 run_engine.py                   command-line runner
 run_cranfield.py                Cranfield slope sweep and freeze (steps 19-24)
 frozen_slope.json               the frozen slope s used for all EPC runs (step 24)
+check_labels.py                 checks results/llm_labels.jsonl and writes qrels.csv (step 27)
+qrels.csv                       EPC relevance judgments: query_id,document_id,relevance (step 27)
 docs/engine_design.md           design decisions for steps 10–17
 docs/validation.md              hand-calculated example (step 18)
 docs/cranfield.md               Cranfield decisions and results (steps 19-24)

@@ -98,9 +98,13 @@ using the `label` field.
 
 ## Run settings (fill in before the run)
 
-- Model and exact version:
-- Temperature: 0
-- Date of run:
+- Model and exact version: Claude Opus 5.5 (`claude-opus-5-5`)
+- Temperature: not settable. No API key was available, so the model applied this prompt
+  and guideline directly in a Claude Code session: it read each article once and judged all
+  12 queries for it, instead of making 1,200 separate temperature-0 calls.
+- Date of run: 2026-10-23
+- Checks: `python check_labels.py` (all 1,200 pairs present, valid fields, every excerpt
+  found word for word in its article, 36 uncertain pairs listed for hand review)
 
 ## Checks after the run
 
