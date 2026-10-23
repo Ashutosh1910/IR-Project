@@ -1,0 +1,74 @@
+[
+  {
+    "query_id": "Q1",
+    "length_group": "small",
+    "text": "placements",
+    "description": "The user wants information on final placements at BITS Pilani: which companies recruited, how many students were placed, salary or offer figures, and how the placement process works. Articles mainly about internships or Practice School do not count unless they substantively cover placements."
+  },
+  {
+    "query_id": "Q2",
+    "length_group": "small",
+    "text": "HuEl",
+    "description": "The user is choosing humanities electives (HuEls) and wants course-by-course information such as content, workload, grading and recommendations. Articles that only list HuEls as a course category, without describing specific courses, do not meet the need."
+  },
+  {
+    "query_id": "Q3",
+    "length_group": "small",
+    "text": "fest budget",
+    "description": "The user wants to know how budgets and registration fees for campus fests (Oasis, BOSM, APOGEE) are proposed, debated and approved, including the amounts involved and objections from students. Articles that mention a fest only as an event, without discussing its money or fees, do not meet the need."
+  },
+  {
+    "query_id": "Q4",
+    "length_group": "small",
+    "text": "online semester",
+    "description": "The user wants to know how academics and student life worked during the COVID-19 online semesters: how classes and exams were conducted, problems students faced, and how the institute handled the move online and back. Articles that mention COVID only in passing do not meet the need."
+  },
+  {
+    "query_id": "Q5",
+    "length_group": "medium",
+    "text": "students union election process",
+    "description": "The user wants to understand how Students' Union elections at BITS Pilani are run: stages such as the Grey Period, nominations, campaigning and voting, the rules candidates must follow, and the Election Commission's role. Articles about a single candidate's platform, without explaining the process, are not what the user wants."
+  },
+  {
+    "query_id": "Q6",
+    "length_group": "medium",
+    "text": "mental health counselling support",
+    "description": "The user wants to understand the state of student mental health on campus and the support available, such as counselling services, how to access them, and student experiences of stress. Articles where mental health is mentioned only briefly do not meet the need."
+  },
+  {
+    "query_id": "Q7",
+    "length_group": "medium",
+    "text": "packing list for freshers",
+    "description": "An incoming first-year student wants practical advice on what to bring to campus: clothing for the weather, bedding, electronics, documents and items that can be bought locally. General campus guides count only if they give substantive packing advice."
+  },
+  {
+    "query_id": "Q8",
+    "length_group": "medium",
+    "text": "dual degree minor options",
+    "description": "The user wants to understand the academic flexibility options at BITS Pilani: how dual degrees are assigned, how to take a minor, branch changes, and similar choices that shape a student's degree. Articles that mention a student's degree without explaining these options do not meet the need."
+  },
+  {
+    "query_id": "Q9",
+    "length_group": "large",
+    "text": "what new sports facilities and tournaments did the sports secretary promise to students",
+    "description": "The user wants to know what the Sports Secretary has proposed or promised for campus sports: new or improved facilities and equipment, tournaments and inter-college events such as BOSM, team support, and how much of this has been delivered. Articles about the Students' Union's general promises, or about sports only as part of a fest's schedule, do not meet the need unless they substantively cover the Sports Secretary's plans."
+  },
+  {
+    "query_id": "Q10",
+    "length_group": "large",
+    "text": "mess food quality complaints and what mess representatives promise to fix",
+    "description": "The user wants information about the hostel mess system: food quality, how messes are managed, complaints, and what mess representatives promise or do. Articles about other eateries or food outlets on campus are not what the user wants."
+  },
+  {
+    "query_id": "Q11",
+    "length_group": "large",
+    "text": "has the student union kept the promises from its election manifesto and what did it achieve",
+    "description": "The user wants an evaluation of how well the Students' Union has performed in office, especially whether it kept its election promises and what it achieved or failed to do. Articles about the election process itself, or pre-election candidate interviews, are not what the user wants."
+  },
+  {
+    "query_id": "Q12",
+    "length_group": "large",
+    "text": "why did students protest against the administration and how did the student union and administration respond",
+    "description": "The user wants to know about student protests at BITS Pilani: what triggered them, how students organised, and how the administration and student bodies responded. Articles that mention disagreements with the administration without describing an actual protest do not meet the need."
+  }
+]
