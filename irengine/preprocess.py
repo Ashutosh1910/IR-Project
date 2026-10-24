@@ -8,12 +8,15 @@ Pipeline, applied identically to articles and queries:
      contractions stay one token ("don't" -> "dont").
   4. Tokens are maximal runs of [a-z0-9]; everything else separates tokens
      (so "cool-down" -> "cool", "down").
-  5. Remove the fixed stopword list. No stemming.
+  5. Remove the fixed stopword list.
+  6. Reduce every remaining token to its Porter stem ("elections" -> "elect").
+     Stopwords are removed before stemming, so the stopword list is not stemmed.
 """
 
 import re
 import unicodedata
 
+from .porter import stem
 from .stopwords import RAW_STOPWORDS
 
 _DROP_CHARS = dict.fromkeys(map(ord, "­​‌‍⁠﻿"))
@@ -41,4 +44,4 @@ STOPWORDS = frozenset(tok for word in RAW_STOPWORDS for tok in tokenize(word))
 
 def preprocess(text: str) -> list[str]:
     """Full pipeline: the token list that gets indexed or used as a query."""
-    return [tok for tok in tokenize(text) if tok not in STOPWORDS]
+    return [stem(tok) for tok in tokenize(text) if tok not in STOPWORDS]

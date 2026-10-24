@@ -1,5 +1,6 @@
 """Cross-checks on the real EPC collection against an independent dense NumPy
-implementation of the same formulas (written separately from the engine)."""
+implementation of the same formulas (written separately from the engine).
+Documents are weighted 1 + ln tf with no IDF; queries (1 + ln tf) * IDF (lnc.ltc)."""
 
 import math
 import unittest
@@ -45,7 +46,7 @@ class Corpus(unittest.TestCase):
         cls.ref_idf = np.log(len(docs) / df)
         with np.errstate(divide="ignore"):
             logtf = np.where(tf > 0, 1 + np.log(np.where(tf > 0, tf, 1)), 0.0)
-        cls.W = logtf * cls.ref_idf
+        cls.W = logtf  # lnc: no IDF on documents
         cls.ref_norms = np.sqrt((cls.W ** 2).sum(axis=1))
         cls.ref_pivot = cls.ref_norms[cls.ref_norms > 0].mean()
 

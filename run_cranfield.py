@@ -4,8 +4,8 @@
 
 1. Load Cranfield through ir_datasets and index it with the same engine as EPC.
 2. Binarize the graded qrels at grade >= 2 (see docs/cranfield.md).
-3. First attempt, kept for the record: one seeded dev/held-out split, sweep
-   s = 0.0, 0.1, ..., 1.0 on dev by MAP, check on held-out.
+3. Single split, kept for the record (it was the first method tried): one seeded
+   dev/held-out split, sweep s = 0.0, 0.1, ..., 1.0 on dev by MAP, check on held-out.
 4. Final procedure: 5-fold cross-validation over all queries. Each fold is scored
    with the slope chosen on the other four folds, and those out-of-fold scores are
    compared with cosine. The frozen slope is the one with the highest MAP over
@@ -111,9 +111,9 @@ def main(argv=None):
     def ev(s, qids, rel=qrels):
         return evaluate({q: rankings[s][q] for q in qids}, rel, k=K)
 
-    # Steps 21-23, first attempt: one dev/held-out split
+    # Steps 21-23, single split (the first method tried, kept for the record)
     dev, held = split_queries(queries, SPLIT_SEED, DEV_FRACTION)
-    print(f"\n=== First attempt: single split (seed {SPLIT_SEED}), dev {len(dev)} / "
+    print(f"\n=== Single split (seed {SPLIT_SEED}), dev {len(dev)} / "
           f"held-out {len(held)} queries ===")
     dev_evals = {s: ev(s, dev) for s in systems}
     held_evals = {s: ev(s, held) for s in systems}
@@ -211,6 +211,7 @@ def main(argv=None):
                        f"s in {SLOPES[0]:g}..{SLOPES[-1]:g} step 0.1",
         "relevance_threshold": RELEVANCE_THRESHOLD,
         "seed": SPLIT_SEED,
+        "pipeline": "Porter stemming; lnc.ltc weights (documents 1+ln tf, queries (1+ln tf)*idf)",
         "all_queries_evaluated": len(cv_cos.per_query),
         "all_queries_map": {"cosine": all_evals[None].map, "pivoted": all_evals[chosen].map},
         "cv": {
@@ -221,7 +222,7 @@ def main(argv=None):
             "randomization_p": cv_cmp[3],
             "confirmed": cv_confirmed,
         },
-        "first_attempt_single_split": {
+        "single_split": {
             "s": split_s,
             "dev_map": {"cosine": dev_evals[None].map, "pivoted": dev_evals[split_s].map},
             "heldout_map": {"cosine": held_evals[None].map, "pivoted": held_evals[split_s].map},

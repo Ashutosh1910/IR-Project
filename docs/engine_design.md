@@ -6,8 +6,8 @@ implementation. No prebuilt TF–IDF vectoriser or retrieval library is used.
 
 | Step | What | Where |
 |---|---|---|
-| 10 | Preprocessing, inverted index | `irengine/preprocess.py`, `irengine/stopwords.py`, `irengine/index.py` |
-| 11 | Log TF, IDF, query weights | `irengine/index.py` (`log_tf`, `InvertedIndex.idf`, `vectorize`) |
+| 10 | Preprocessing, stemming, inverted index | `irengine/preprocess.py`, `irengine/stopwords.py`, `irengine/porter.py`, `irengine/index.py` |
+| 11 | Weights (lnc.ltc) | `irengine/index.py` (`log_tf`, `InvertedIndex.idf`, `vectorize`) |
 | 12 | Cosine scoring | `irengine/scoring.py` (`cosine_scores`) |
 | 13 | Pivot | `irengine/index.py` (`InvertedIndex.pivot`) |
 | 14 | Pivoted scoring | `irengine/scoring.py` (`pivoted_scores`), `InvertedIndex.pivoted_factor(s)` |
@@ -35,7 +35,18 @@ Articles and queries go through the same function, `irengine.preprocess.preproce
    goes through steps 1–4 itself, so it matches the normalised text (`it's` → `it`).
    Contractions that collapse into ordinary words (`we'll` → `well`, `I'd` → `id`,
    `she'll` → `shell`) are left out on purpose.
-6. There is no stemming.
+6. Every remaining token is reduced to its **Porter stem** (`elections` → `elect`,
+   `HuEls` → `huel`), using `irengine/porter.py`, written from Porter (1980). It follows
+   the original rules, not later variants. On all 16,009 distinct words in Cranfield
+   and EPC it matches the Snowball "porter" stemmer, except that one- and two-letter
+   words are left unchanged, as in Porter's own code. Stopwords are removed before
+   stemming.
+
+**Why stem.** The paper does not mention stemming, but its experiments ran on SMART,
+whose standard indexing stems words. Without it, `election` and `elections` are
+unrelated terms. Stemming is applied
+identically for both methods, so it does not favour either. On Cranfield it raised
+cosine MAP from 0.2643 to 0.2828 (with lnc.ltc weights); see `docs/cranfield.md`.
 
 **What is indexed.** By default the title is indexed together with the body
 (`title + "\n" + text`), because the relevance judges see both. `--no-title` indexes
@@ -45,24 +56,36 @@ engine uses.
 
 **Index structure.** `InvertedIndex.postings[term]` holds a list of
 `(document position, raw count)`, sorted by position. `weighted_postings[term]` holds
-the same entries with the TF–IDF weight. Document norms and the pivot are
+the same entries with the document weight w(t,d). Document norms and the pivot are
 computed once, when the index is built, and frozen after that.
 
-Current EPC collection (title + body): 100 documents, 11,848 terms, 967.8 tokens per
-document after preprocessing (range 496–2,664), norms 54.19–124.88, pivot
-**p = 77.752347**, no zero-norm documents, and no term in every document.
+Current EPC collection (title + body): 100 documents, 7,744 terms (stems), 967.8 tokens
+per document after preprocessing (range 496–2,664), norms 24.15–53.87, pivot
+**p = 33.128197**, no zero-norm documents, and no term in every document.
 
-## Step 11: weights
+## Step 11: weights (the paper's lnc.ltc)
 
-- TF(t,d) = 1 + ln f(t,d) if f(t,d) > 0, else 0. IDF(t) = ln(N / df(t)). w = TF · IDF.
+The paper (section 3) weights documents and queries differently: "the idf factor is
+only used in the query term weights and not in the document term weights". In SMART
+notation this is lnc.ltc, and the engine follows it.
+
+- TF(t,x) = 1 + ln f(t,x) if f(t,x) > 0, else 0. IDF(t) = ln(N / df(t)).
+- **Documents:** w(t,d) = TF(t,d), with no IDF. The norm n_d and the pivot are
+  computed from these weights, as in the paper (its pivot is "the average cosine
+  factor for 1+log(tf) weighted documents").
+- **Queries:** w(t,q) = TF(t,q) · IDF(t). `vectorize` drops query terms that are not
+  in the vocabulary before the query norm is computed, so an unseen term changes
+  neither the dot product nor n_q (step 12).
 - **N counts every document in the collection, including zero-vector ones.** A
   document that is all stopwords still belongs to the collection.
-- A term that appears in every document has IDF 0, so its weight is 0. It adds
-  nothing to norms or dot products.
-- **Queries** use the same TF rule on query-term counts and the collection's IDF.
-  `vectorize` drops query terms that are not in the vocabulary, before the query
-  norm is computed. An unseen term therefore changes neither the dot product nor
-  n_q (step 12).
+- A term that appears in every document has IDF 0, so its query weight is 0 and it
+  never adds to a score. It still counts toward the document norms, because
+  documents carry no IDF.
+
+An earlier version used TF · IDF on both sides, which counts IDF twice in every score
+and builds the norms from IDF-weighted vectors. The proposal called that an
+adaptation; it was replaced to match the paper. On Cranfield, lnc.ltc gives higher
+MAP for both cosine and pivoted (see `docs/cranfield.md`).
 
 ## Step 12: cosine
 

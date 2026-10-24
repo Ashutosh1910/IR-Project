@@ -1,7 +1,9 @@
 """Step 18: the hand-calculated example from docs/validation.md.
 
 Every expected value below is written as the closed form derived by hand
-(L = ln 2), never computed by calling the engine. The 6-decimal literals in
+(L = ln 2), never computed by calling the engine. Documents are weighted 1 + ln tf
+with no IDF and queries (1 + ln tf) * IDF (the paper's lnc.ltc). Terms are Porter
+stems: apple -> appl, cherry -> cherri. The 6-decimal literals in
 the doc are checked too, so the doc and the code cannot drift apart.
 """
 
@@ -20,17 +22,17 @@ DOCS = [
     (4, "The and of it."),  # only stopwords -> zero vector
 ]
 
-N1 = L * math.sqrt((1 + L) ** 2 + 1)
-N2 = L * math.sqrt(2)
-N3 = L * math.sqrt(6)
+N1 = math.sqrt((1 + L) ** 2 + 1)
+N2 = math.sqrt(2)
+N3 = math.sqrt(3)
 P = (N1 + N2 + N3) / 3  # doc 4 excluded from the pivot
 NQ = L * math.sqrt(2)   # norm of both two-term queries
 
 # Hand-derived dot products sum_t w(t,q) w(t,d)
 Q1 = "apple banana"
-Q1_DOT = {1: L * L * (2 + L), 2: L * L, 3: L * L}
+Q1_DOT = {1: L * (2 + L), 2: L, 3: L}
 Q2 = "banana cherry"
-Q2_DOT = {1: L * L, 2: L * L, 3: 2 * L * L}
+Q2_DOT = {1: L, 2: L, 3: 2 * L}
 NORMS = {1: N1, 2: N2, 3: N3}
 
 
@@ -54,27 +56,27 @@ class ToyExample(unittest.TestCase):
     # ---- index, TF, IDF (steps 10, 11) ----
     def test_postings_and_df(self):
         self.assertEqual(self.ix.N, 4)
-        self.assertEqual(self.ix.postings["apple"], [(0, 2), (1, 1)])
+        self.assertEqual(self.ix.postings["appl"], [(0, 2), (1, 1)])
         self.assertEqual(self.ix.postings["banana"], [(0, 1), (2, 1)])
         self.assertEqual(self.ix.postings["date"], [(2, 1)])
-        self.assertEqual(self.ix.df, {"apple": 2, "banana": 2, "cherry": 2, "date": 1})
+        self.assertEqual(self.ix.df, {"appl": 2, "banana": 2, "cherri": 2, "date": 1})
         self.assertEqual(self.ix.doc_lengths, [3, 2, 3, 0])
 
     def test_idf_uses_all_documents(self):
-        for t in ("apple", "banana", "cherry"):
+        for t in ("appl", "banana", "cherri"):
             self.assertAlmostEqual(self.ix.idf[t], L, places=15)  # ln(4/2)
         self.assertAlmostEqual(self.ix.idf["date"], 2 * L, places=15)  # ln(4/1)
 
-    def test_document_weights(self):
-        self.assertAlmostEqual(self.ix.document_vector(1)["apple"], (1 + L) * L, places=15)
-        self.assertAlmostEqual(self.ix.document_vector(1)["banana"], L, places=15)
-        self.assertAlmostEqual(self.ix.document_vector(3)["date"], 2 * L, places=15)
+    def test_document_weights_have_no_idf(self):
+        self.assertAlmostEqual(self.ix.document_vector(1)["appl"], 1 + L, places=15)
+        self.assertEqual(self.ix.document_vector(1)["banana"], 1.0)
+        self.assertEqual(self.ix.document_vector(3)["date"], 1.0)  # rarer term, same weight
         self.assertEqual(self.ix.document_vector(4), {})
 
-    def test_query_weights_use_same_rule(self):
-        self.assertEqual(self.ix.vectorize("apple banana").keys(), {"apple", "banana"})
+    def test_query_weights_include_idf(self):
+        self.assertEqual(self.ix.vectorize("apple banana").keys(), {"appl", "banana"})
         q = self.ix.vectorize("apple apple date")
-        self.assertAlmostEqual(q["apple"], (1 + L) * L, places=15)
+        self.assertAlmostEqual(q["appl"], (1 + L) * L, places=15)
         self.assertAlmostEqual(q["date"], 2 * L, places=15)
 
     def test_norms(self):
@@ -82,14 +84,14 @@ class ToyExample(unittest.TestCase):
             self.assertAlmostEqual(self.ix.norms[pos], n, places=14)
         self.assertEqual(self.ix.norms[3], 0.0)
         # values printed in docs/validation.md
-        self.assertAlmostEqual(self.ix.norms[0], 1.363008, places=6)
-        self.assertAlmostEqual(self.ix.norms[1], 0.980258, places=6)
-        self.assertAlmostEqual(self.ix.norms[2], 1.697857, places=6)
+        self.assertAlmostEqual(self.ix.norms[0], 1.966405, places=6)
+        self.assertAlmostEqual(self.ix.norms[1], 1.414214, places=6)
+        self.assertAlmostEqual(self.ix.norms[2], 1.732051, places=6)
 
     # ---- pivot (step 13) ----
     def test_pivot_excludes_zero_norm_document(self):
         self.assertAlmostEqual(self.ix.pivot, P, places=14)
-        self.assertAlmostEqual(self.ix.pivot, 1.347041, places=6)
+        self.assertAlmostEqual(self.ix.pivot, 1.704223, places=6)
         self.assertEqual(self.ix.num_nonzero_docs, 3)
         self.assertNotAlmostEqual(self.ix.pivot, (N1 + N2 + N3) / 4, places=3)
 
@@ -100,7 +102,7 @@ class ToyExample(unittest.TestCase):
             self.assertAlmostEqual(got[d], v, places=14)
         self.assertAlmostEqual(got[1], 0.968439, places=6)
         self.assertAlmostEqual(got[2], 0.5, places=14)
-        self.assertAlmostEqual(got[3], 1 / math.sqrt(12), places=14)
+        self.assertAlmostEqual(got[3], 1 / math.sqrt(6), places=14)
         self.assertEqual(got[4], 0.0)
 
     def test_cosine_ranking(self):
@@ -129,11 +131,13 @@ class ToyExample(unittest.TestCase):
             self.assertEqual(pivoted_scores(self.ix, qv, 0.0), [0.0] * 4)
             self.assertEqual(search(self.ix, q), [])
 
-    def test_term_in_every_document_has_zero_weight(self):
+    def test_term_in_every_document_has_zero_query_weight(self):
         ix = InvertedIndex([(1, "common alpha"), (2, "common beta"), (3, "common")])
         self.assertEqual(ix.idf["common"], 0.0)
-        self.assertEqual(ix.norms[2], 0.0)  # doc 3 has only the IDF-0 term
+        # no IDF on documents, so the IDF-0 term still counts toward the norms
+        self.assertEqual(ix.norms, [math.sqrt(2), math.sqrt(2), 1.0])
         self.assertEqual(ix.vectorize("common"), {})
+        self.assertEqual(search(ix, "common"), [])
         self.assertEqual(search(ix, "common alpha"), search(ix, "alpha"))
 
     # ---- pivoted (step 14) ----
@@ -143,9 +147,9 @@ class ToyExample(unittest.TestCase):
             for d, v in expected(dots, s=0.5).items():
                 self.assertAlmostEqual(got[d], v, places=14)
         got = self.scores_by_id(pivoted_scores(self.ix, self.ix.vectorize(Q1), 0.5))
-        self.assertAlmostEqual(got[1], 0.974145, places=6)
-        self.assertAlmostEqual(got[2], 0.421200, places=6)
-        self.assertAlmostEqual(got[3], 0.321935, places=6)
+        self.assertAlmostEqual(got[1], 1.037611, places=6)
+        self.assertAlmostEqual(got[2], 0.453501, places=6)
+        self.assertAlmostEqual(got[3], 0.411554, places=6)
 
     def test_pivot_raises_long_lowers_short(self):
         """Doc 1 (n_d > p) gains and doc 2 (n_d < p) loses as s drops below 1."""
@@ -172,7 +176,7 @@ class ToyExample(unittest.TestCase):
         for d, dot in Q1_DOT.items():
             self.assertAlmostEqual(got[d], dot / (NQ * P), places=14)
         self.assertEqual(got[2], got[3])
-        self.assertAlmostEqual(got[2], 0.363856, places=6)
+        self.assertAlmostEqual(got[2], 0.414914, places=6)
 
     def test_slope_out_of_range_rejected(self):
         qv = self.ix.vectorize(Q1)
