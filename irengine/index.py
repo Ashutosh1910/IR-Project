@@ -1,13 +1,18 @@
-"""Inverted index with log-TF x IDF weights, vector norms and the pivot (steps 10, 11, 13).
+"""Inverted index with the paper's lnc.ltc weights, vector norms and the pivot (steps 10, 11, 13).
 
-    TF(t, d)  = 1 + ln f(t, d)   if f(t, d) > 0, else 0
+Weights follow Singhal, Buckley & Mitra (1996), section 3: "the idf factor is only
+used in the query term weights and not in the document term weights" (SMART lnc.ltc).
+
+    TF(t, x)  = 1 + ln f(t, x)   if f(t, x) > 0, else 0
     IDF(t)    = ln(N / df(t))
-    w(t, d)   = TF(t, d) * IDF(t)
+    w(t, d)   = TF(t, d)                document weight (l n c: log TF, no IDF)
+    w(t, q)   = TF(t, q) * IDF(t)       query weight    (l t c: log TF, IDF)
     n_d       = sqrt(sum_t w(t, d)^2)
     p         = mean of n_d over documents with n_d > 0
 
-Queries are weighted with the same TF rule and the collection's IDF; query terms
-that are not in the collection vocabulary are ignored.
+Query terms that are not in the collection vocabulary are ignored. A term found in
+every document has IDF 0, so it gets query weight 0 and never adds to a score, but it
+still counts toward the document norms, as in the paper.
 """
 
 import math
@@ -67,7 +72,7 @@ class InvertedIndex:
 
         # term -> [(doc position, w(t, d))]; used for scoring
         self.weighted_postings = {
-            t: [(pos, log_tf(count) * self.idf[t]) for pos, count in plist]
+            t: [(pos, log_tf(count)) for pos, count in plist]
             for t, plist in self.postings.items()
         }
 
@@ -88,7 +93,7 @@ class InvertedIndex:
         return len(self.postings)
 
     def weigh_counts(self, counts: dict[str, int]) -> Vector:
-        """Weight raw term counts with log TF and the collection IDF.
+        """Query weights w(t, q) = TF(t, q) * IDF(t) for raw term counts.
 
         Terms outside the vocabulary are dropped, as are zero weights
         (a term in every document has IDF 0)."""
@@ -103,7 +108,7 @@ class InvertedIndex:
         return vec
 
     def vectorize(self, text: str) -> Vector:
-        """Preprocess and weight a query (or any new text) against this collection."""
+        """Preprocess a query and weight it against this collection."""
         return self.weigh_counts(Counter(self.preprocess(text)))
 
     def document_vector(self, doc_id: DocId) -> Vector:

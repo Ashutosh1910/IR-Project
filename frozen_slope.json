@@ -3,49 +3,50 @@
   "selected_on": "cranfield, all queries with >= 1 relevant document, MAP, s in 0..1 step 0.1",
   "relevance_threshold": 2,
   "seed": 15,
+  "pipeline": "Porter stemming; lnc.ltc weights (documents 1+ln tf, queries (1+ln tf)*idf)",
   "all_queries_evaluated": 215,
   "all_queries_map": {
-    "cosine": 0.2521642205676159,
-    "pivoted": 0.25910786558420584
+    "cosine": 0.28281855268642997,
+    "pivoted": 0.2893610517397684
   },
   "cv": {
     "folds": 5,
     "fold_slopes": [
+      0.4,
       0.7,
-      0.8,
       0.8,
       0.8,
       0.8
     ],
     "out_of_fold_map": {
-      "cosine": 0.2521642205676159,
-      "pivoted": 0.2561872789343909
+      "cosine": 0.28281855268642997,
+      "pivoted": 0.28105835385334976
     },
     "ap_better_worse_equal": [
-      115,
-      83,
-      17
+      118,
+      86,
+      11
     ],
-    "randomization_p": 0.282971702829717,
-    "confirmed": true
+    "randomization_p": 0.8114188581141886,
+    "confirmed": false
   },
-  "first_attempt_single_split": {
-    "s": 0.4,
+  "single_split": {
+    "s": 0.7,
     "dev_map": {
-      "cosine": 0.23116476577830572,
-      "pivoted": 0.23955134493278282
+      "cosine": 0.2778975464637099,
+      "pivoted": 0.2855255104564669
     },
     "heldout_map": {
-      "cosine": 0.27296923596072875,
-      "pivoted": 0.25472098480352506
+      "cosine": 0.2876939940367175,
+      "pivoted": 0.2919688764471991
     },
     "heldout_ap_better_worse_equal": [
-      54,
-      48,
-      6
+      56,
+      43,
+      9
     ],
-    "heldout_randomization_p": 0.14908509149085092,
-    "heldout_confirmed": false
+    "heldout_randomization_p": 0.7322267773222678,
+    "heldout_confirmed": true
   },
-  "cranfield_pivot": 35.09937654419804
+  "cranfield_pivot": 10.344049217930745
 }
