@@ -1,18 +1,3 @@
-"""Evaluation metrics (step 16) and handling of queries without relevant documents (step 17).
-
-For a ranking r_1, r_2, ... and relevant set R (|R| > 0):
-    P@k  = |{r_1..r_k} ∩ R| / k          (always divided by k, even if fewer than k were retrieved)
-    R@k  = |{r_1..r_k} ∩ R| / |R|
-    F1@k = 2 P@k R@k / (P@k + R@k)       (0 when both are 0)
-    AP   = (1/|R|) * sum over ranks i where r_i ∈ R of P@i
-           -> relevant documents that were never retrieved contribute 0
-    MAP  = mean AP over evaluated queries
-
-Averages are macro averages over queries; mean F1@10 is the mean of per-query
-F1@10 values (not the F1 of mean P and mean R). Queries with no relevant
-documents are listed separately and excluded from every average.
-"""
-
 from dataclasses import dataclass, field
 from typing import Hashable, Mapping, Optional, Sequence
 
@@ -33,6 +18,7 @@ def _hits_at(ranking: Sequence[DocId], relevant: set, k: int) -> int:
 
 def precision_at_k(ranking: Sequence[DocId], relevant: set, k: int = 10) -> float:
     _check(ranking, k)
+    # Always divided by k, even if fewer were retrieved
     return _hits_at(ranking, relevant, k) / k
 
 
@@ -53,6 +39,7 @@ def average_precision(ranking: Sequence[DocId], relevant: set) -> float:
     _check(ranking)
     if not relevant:
         raise ValueError("AP is undefined for a query with no relevant documents")
+    # Relevant documents never retrieved add 0
     hits, total = 0, 0.0
     for i, d in enumerate(ranking, start=1):
         if d in relevant:
@@ -76,7 +63,7 @@ class QueryResult:
 class NoRelevantQuery:
     query_id: QueryId
     num_retrieved: int
-    labelled: bool  # False if the query had no relevance labels at all
+    labelled: bool
 
 
 @dataclass
@@ -112,13 +99,9 @@ def evaluate(
     qrels: Mapping[QueryId, set],
     k: int = 10,
 ) -> Evaluation:
-    """Evaluate one system's rankings.
-
-    ``rankings`` decides which queries are evaluated (in its order). ``qrels`` maps a
-    query to its set of relevant document IDs; a missing entry or an empty set
-    puts the query in ``no_relevant`` instead of the averages."""
     result = Evaluation(k=k)
     for qid, ranking in rankings.items():
+        # Queries without relevant documents are left out of averages
         relevant = qrels.get(qid)
         if not relevant:
             result.no_relevant.append(

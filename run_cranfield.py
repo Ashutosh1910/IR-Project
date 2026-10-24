@@ -1,19 +1,3 @@
-"""Cranfield development run: choose and freeze the pivoted slope s (steps 19-24).
-
-  python run_cranfield.py [--out results/cranfield] [--force]
-
-1. Load Cranfield through ir_datasets and index it with the same engine as EPC.
-2. Binarize the graded qrels at grade >= 2 (see docs/cranfield.md).
-3. Single split, kept for the record (it was the first method tried): one seeded
-   dev/held-out split, sweep s = 0.0, 0.1, ..., 1.0 on dev by MAP, check on held-out.
-4. Final procedure: 5-fold cross-validation over all queries. Each fold is scored
-   with the slope chosen on the other four folds, and those out-of-fold scores are
-   compared with cosine. The frozen slope is the one with the highest MAP over
-   all queries.
-5. Write frozen_slope.json, which the EPC tools read. An existing file with a
-   different slope is never overwritten unless --force is given.
-"""
-
 import argparse
 import csv
 import json
@@ -65,7 +49,6 @@ def print_table(title, rows):
 
 
 def compare_ap(pivoted, cosine):
-    """(better, worse, equal, p) for per-query AP; both evaluations in the same query order."""
     ap_piv = [q.average_precision for q in pivoted.per_query]
     ap_cos = [q.average_precision for q in cosine.per_query]
     assert [q.query_id for q in pivoted.per_query] == [q.query_id for q in cosine.per_query]
@@ -81,15 +64,14 @@ def main(argv=None):
                         help="overwrite frozen_slope.json even if it holds a different slope")
     args = parser.parse_args(argv)
 
-    # Step 19: load and index
     documents, queries, graded = load_cranfield()
+    # Same engine and preprocessing as EPC
     index = InvertedIndex(documents)
     print(f"Cranfield: {index.N} documents, {len(queries)} queries, "
           f"{sum(len(g) for g in graded.values())} graded judgments")
     print(f"  vocabulary {index.vocabulary_size}, zero-norm documents "
           f"{index.N - index.num_nonzero_docs}, pivot p = {index.pivot:.6f}")
 
-    # Step 20: binarize
     grade_counts: dict = {}
     for grades in graded.values():
         for g in grades.values():
@@ -101,8 +83,8 @@ def main(argv=None):
           f"{sum(len(r) for r in qrels.values())} relevant pairs, "
           f"{len(queries) - len(no_rel)} queries with >= 1 relevant, {len(no_rel)} without")
 
-    # One full ranking per query and system; splits and folds only choose which are scored.
     systems = [None] + SLOPES
+    # Rank every query once per system; splits only choose which to score
     rankings = {
         s: {qid: [d for d, _ in search(index, text, s=s)] for qid, text in queries.items()}
         for s in systems
@@ -111,7 +93,7 @@ def main(argv=None):
     def ev(s, qids, rel=qrels):
         return evaluate({q: rankings[s][q] for q in qids}, rel, k=K)
 
-    # Steps 21-23, single split (the first method tried, kept for the record)
+    # First attempt: one dev/held-out split
     dev, held = split_queries(queries, SPLIT_SEED, DEV_FRACTION)
     print(f"\n=== Single split (seed {SPLIT_SEED}), dev {len(dev)} / "
           f"held-out {len(held)} queries ===")
@@ -130,7 +112,7 @@ def main(argv=None):
     print_table("Held-out sweep (context only, not used for selection)",
                 [(system_name(s), summarize(held_evals[s])) for s in systems])
 
-    # Steps 21-23, final procedure: 5-fold cross-validation over all queries
+    # Final procedure: 5-fold cross-validation
     folds = kfold_split(queries, FOLDS, SPLIT_SEED)
     print(f"\n=== Final procedure: {FOLDS}-fold cross-validation (seed {SPLIT_SEED}), "
           f"folds of {', '.join(str(len(f)) for f in folds)} queries ===")
@@ -162,8 +144,8 @@ def main(argv=None):
           f"{cv_cmp[2]} equal; paired randomization p = {cv_cmp[3]:.4f} ({RESAMPLES} resamples)")
     print(f"  confirmed (out-of-fold MAP above cosine): {'yes' if cv_confirmed else 'NO'}")
 
-    # Step 24 input: the slope with the highest MAP over all queries
     all_evals = {s: ev(s, all_ids) for s in systems}
+    # Frozen slope: best MAP over all queries
     chosen = select_slope({s: all_evals[s].map for s in SLOPES})
     print_table("All-query sweep (selects the frozen slope)",
                 [(system_name(s), summarize(all_evals[s])) for s in systems])
@@ -232,6 +214,7 @@ def main(argv=None):
         },
         "cranfield_pivot": index.pivot,
     }
+    # Keep an existing different slope unless --force
     if FROZEN_PATH.exists():
         old = json.loads(FROZEN_PATH.read_text(encoding="utf-8"))
         if old.get("s") != chosen and not args.force:

@@ -1,22 +1,10 @@
-"""Cranfield development collection: loading, binarization, query splits, slope choice (steps 19-23).
-
-    relevance grades (ir_datasets "cranfield"):
-       4  complete answer          3  high degree of relevance
-       2  useful background/method 1  minimum interest (e.g. historical)
-      -1  no interest
-    a document is relevant  <=>  grade >= RELEVANCE_THRESHOLD (default 2)
-
-Query splits (the single dev/held-out split and the cross-validation folds) are
-seeded shuffles of all query IDs, made independently of the relevance labels, so
-changing the threshold never changes a split.
-"""
-
 import random
 from typing import Iterable, Mapping
 
 from .data import _parse_id
 
 DATASET = "cranfield"
+# Grades 2-4 count as relevant
 RELEVANCE_THRESHOLD = 2
 SPLIT_SEED = 15
 DEV_FRACTION = 0.5
@@ -26,16 +14,11 @@ SLOPE_TIE_DECIMALS = 12
 
 
 def load_cranfield(dataset: str = DATASET):
-    """(documents, queries, graded qrels) from ir_datasets.
-
-    documents: [(doc_id, text)] in collection order. The ``text`` field already
-               starts with the title, so the title is not added a second time.
-    queries:   query_id -> text
-    graded:    query_id -> {doc_id: grade}; every query has an entry.
-    """
-    import ir_datasets  # only the Cranfield experiments need it
+    # Imported here so only Cranfield runs need it
+    import ir_datasets
 
     ds = ir_datasets.load(dataset)
+    # The text field already starts with the title
     documents = [(_parse_id(d.doc_id), d.text) for d in ds.docs_iter()]
     queries = {q.query_id: q.text for q in ds.queries_iter()}
     graded: dict = {qid: {} for qid in queries}
@@ -50,19 +33,16 @@ def load_cranfield(dataset: str = DATASET):
 
 
 def binarize(graded: Mapping, threshold: int = RELEVANCE_THRESHOLD) -> dict:
-    """query_id -> set of doc IDs with grade >= threshold (empty set if none)."""
     return {
         qid: {d for d, g in grades.items() if g >= threshold}
         for qid, grades in graded.items()
     }
 
 
+# Seeded dev/held-out split of query IDs, independent of labels
 def split_queries(
     query_ids: Iterable, seed: int = SPLIT_SEED, dev_fraction: float = DEV_FRACTION
 ) -> tuple[list, list]:
-    """Seeded, fixed (dev, held-out) split; each part is returned in ID order.
-
-    IDs are sorted before shuffling so the split does not depend on input order."""
     ids = sorted(query_ids, key=_parse_id)
     shuffled = list(ids)
     random.Random(seed).shuffle(shuffled)
@@ -71,10 +51,8 @@ def split_queries(
     return [q for q in ids if q in dev], [q for q in ids if q in held]
 
 
+# Seeded k-fold split of query IDs
 def kfold_split(query_ids: Iterable, k: int = FOLDS, seed: int = SPLIT_SEED) -> list[list]:
-    """Seeded, fixed partition into k folds of (nearly) equal size, each in ID order.
-
-    Like ``split_queries`` it uses only the IDs, never the labels."""
     ids = sorted(query_ids, key=_parse_id)
     shuffled = list(ids)
     random.Random(seed).shuffle(shuffled)
@@ -82,7 +60,6 @@ def kfold_split(query_ids: Iterable, k: int = FOLDS, seed: int = SPLIT_SEED) -> 
     return [[q for q in ids if q in fold] for fold in folds]
 
 
+# Highest MAP wins; ties go to the larger s
 def select_slope(map_by_slope: Mapping[float, float]) -> float:
-    """The slope with the highest dev MAP; ties (to 12 decimals) go to the larger s,
-    i.e. the choice closer to plain cosine."""
     return max(map_by_slope, key=lambda s: (round(map_by_slope[s], SLOPE_TIE_DECIMALS), s))

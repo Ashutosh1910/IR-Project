@@ -1,5 +1,3 @@
-"""From-scratch TF-IDF retrieval engine: cosine vs pivoted length normalization."""
-
 from .index import InvertedIndex, log_tf, vector_norm
 from .metrics import (
     average_precision,

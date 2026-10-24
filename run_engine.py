@@ -1,15 +1,3 @@
-"""Command-line entry point for the retrieval engine.
-
-  python run_engine.py stats
-  python run_engine.py search "election commission rules" [--s 0.8] --k 10
-  python run_engine.py evaluate --queries queries.json --qrels qrels.csv [--s ...] [--out results/]
-
-`evaluate` always includes cosine as the baseline and reports queries without
-relevant documents separately (they are excluded from all averages). Pivoted
-runs default to the slope frozen on Cranfield (frozen_slope.json, written by
-run_cranfield.py); --s overrides it.
-"""
-
 import argparse
 import csv
 import json
@@ -26,8 +14,8 @@ DEFAULT_SLOPES = [round(0.1 * i, 1) for i in range(11)]
 FROZEN_SLOPE_PATH = ROOT / "frozen_slope.json"
 
 
+# Slope chosen on Cranfield, once run_cranfield.py has run
 def frozen_slope():
-    """The slope frozen on Cranfield (step 24), or None if run_cranfield.py has not run."""
     if not FROZEN_SLOPE_PATH.exists():
         return None
     with open(FROZEN_SLOPE_PATH, encoding="utf-8") as f:
@@ -98,7 +86,7 @@ def cmd_evaluate(args):
         print(f"{r['system']:<16}{_fmt(r[f'P@{args.k}']):>8}{_fmt(r[f'R@{args.k}']):>8}"
               f"{_fmt(r[f'F1@{args.k}']):>8}{_fmt(r['MAP']):>8}   {r['evaluated_queries']}")
 
-    # The set of no-relevant queries depends only on the labels, not the system.
+    # Queries without relevant documents are listed, not averaged
     if no_rel:
         print("\nQueries with no relevant documents (excluded from all averages):")
         for q in no_rel:
