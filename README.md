@@ -41,13 +41,19 @@ irengine/
   significance.py               paired randomization test
 run_engine.py                   command-line runner
 run_cranfield.py                Cranfield slope sweep and freeze (steps 19-24)
+run_epc.py                      main EPC evaluation: cosine vs pivoted, length groups, disagreements (steps 35-40)
 frozen_slope.json               the frozen slope s used for all EPC runs (step 24)
 check_labels.py                 checks results/llm_labels.jsonl and writes qrels.csv (step 27)
-qrels.csv                       EPC relevance judgments: query_id,document_id,relevance (step 27)
+qrels.csv                       EPC relevance judgments: query_id,document_id,relevance,source (step 27);
+                                source is "manual" for hand-reviewed pairs, "llm" otherwise
+manual_labels.csv               hand-review decisions that override LLM labels (steps 30-32)
+qrels_final.csv                 frozen EPC labels used for evaluation; checksum in labels_frozen.json (step 34)
 docs/engine_design.md           design decisions for steps 10–17
 docs/validation.md              hand-calculated example (step 18)
 docs/cranfield.md               Cranfield decisions and results (steps 19-24)
 docs/changes.md                 changes after the first freeze: stemming, lnc.ltc, slope refrozen
+docs/label_review.md            manual review of the EPC labels: what was checked and changed (steps 30-33)
+docs/epc_evaluation.md          main EPC results (steps 35-40)
 tests/                          unit tests: toy example, metrics, preprocessing, Cranfield helpers,
                                 NumPy cross-check
 ```
