@@ -54,6 +54,7 @@ docs/cranfield.md               Cranfield decisions and results (steps 19-24)
 docs/changes.md                 changes after the first freeze: stemming, lnc.ltc, slope refrozen
 docs/label_review.md            manual review of the EPC labels: what was checked and changed (steps 30-33)
 docs/epc_evaluation.md          main EPC results (steps 35-40)
+docs/pivoted_normalization_results.pdf  charts and tables of all results so far (PDF export of the results dashboard)
 tests/                          unit tests: toy example, metrics, preprocessing, Cranfield helpers,
                                 NumPy cross-check
 ```
