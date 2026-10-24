@@ -6,7 +6,8 @@ articles: articles.json (list of objects) or articles.csv, with at least
           document_id, title, text.
 queries:  JSON list of {"query_id", "text", ...} or CSV with query_id,text columns.
 qrels:    CSV with query_id,document_id,relevance. relevance > 0 means relevant;
-          explicit 0 rows are allowed (the LLM labels every pair).
+          explicit 0 rows are allowed (the LLM labels every pair). Other columns,
+          such as qrels.csv's source (llm or manual), are ignored.
 """
 
 import csv

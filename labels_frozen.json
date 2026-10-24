@@ -1,0 +1,30 @@
+{
+  "file": "qrels_final.csv",
+  "sha256": "704626c71bd907bb979d03a00a868600558b679a6df873dd7441e15502d33d1c",
+  "frozen_on": "2026-10-24",
+  "pairs": 1200,
+  "relevant": 43,
+  "relevant_per_query": {
+    "Q1": 2,
+    "Q2": 4,
+    "Q3": 4,
+    "Q4": 6,
+    "Q5": 3,
+    "Q6": 3,
+    "Q7": 4,
+    "Q8": 2,
+    "Q9": 2,
+    "Q10": 3,
+    "Q11": 8,
+    "Q12": 2
+  },
+  "source_counts": {
+    "manual": 36,
+    "llm": 1164
+  },
+  "review_completed": "all 36 uncertain pairs (stage 'uncertain' in manual_labels.csv)",
+  "review_not_done": [
+    "29 LLM-positive pairs outside the uncertain set (step 30)",
+    "random sample of negatives per query (step 31)"
+  ]
+}

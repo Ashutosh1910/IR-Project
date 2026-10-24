@@ -1,8 +1,9 @@
 # EPC LLM Labeling Prompt (step 27)
 
-Each (query, article) pair is labeled by one LLM call: 12 queries × 100 articles = 1,200
-calls. Every call uses the same system prompt. The user message is filled in per pair.
-Placeholders are in `{CURLY_BRACES}`.
+The prompt is designed for one LLM call per (query, article) pair: 12 queries × 100
+articles = 1,200 calls, all with the same system prompt and a user message filled in for
+that pair. Placeholders are in `{CURLY_BRACES}`. **The actual run did not follow this
+design**: it judged all 12 queries for an article together. See "Run settings" below.
 
 ## System prompt (identical for every call)
 
@@ -80,13 +81,13 @@ Each call returns one JSON object, for example:
 }
 ```
 
-The labeling script adds `query_id` and `document_id` and writes one record per pair to
-`results/llm_labels.jsonl`. It then writes `qrels.csv` (`query_id,document_id,relevance`)
-using the `label` field.
+Each line of `results/llm_labels.jsonl` is one such object plus `query_id` and
+`document_id`, one line per pair. `check_labels.py` validates the records and writes
+`qrels.csv` (`query_id,document_id,relevance`) from the `label` field.
 
 ## Design choices
 
-- **The guideline goes in the system prompt** so all 1,200 calls are judged by identical rules.
+- **The guideline goes in the system prompt** so all 1,200 judgments follow identical rules.
 - **The article comes before the question.** With long articles (some are over 4,000
   words), models tend to judge more accurately when the document comes first and the task last.
 - **The label comes before the reason**, which keeps the output short and easy to parse.
@@ -96,22 +97,34 @@ using the `label` field.
 - **Outside knowledge is not allowed**, so an article is never marked relevant for what
   the model knows about BITS Pilani instead of what the article says.
 
-## Run settings (fill in before the run)
+## Run settings
 
 - Model and exact version: Claude Opus 5.5 (`claude-opus-5-5`)
-- Temperature: not settable. No API key was available, so the model applied this prompt
-  and guideline directly in a Claude Code session: it read each article once and judged all
-  12 queries for it, instead of making 1,200 separate temperature-0 calls.
+- How it was run: no API key was available, so instead of 1,200 separate calls the model
+  applied this prompt and guideline directly in a Claude Code session. It read each article
+  once and judged all 12 queries for it: 100 passes, one per article, not one call per pair.
+- Temperature: not settable in that setting.
 - Date of run: 2026-10-23
 - Checks: `python check_labels.py` (all 1,200 pairs present, valid fields, every excerpt
-  found word for word in its article, 36 uncertain pairs listed for hand review)
+  found word for word in its article's title or text, 36 uncertain pairs listed for hand
+  review)
+
+**Departure from the design and the proposal.** The proposal and step 28 describe one
+judgment per (query, article) pair. Because the 12 judgments for an article were made
+together, one may have influenced another, and the run cannot be repeated call by call.
+State this in the report.
+
+**Not yet recorded:** what else the session could see, for example whether the retrieval
+engine or any rankings were open. The proposal promises the labeller never sees retrieval
+scores or rankings, so add this before the report.
 
 ## Checks after the run
 
 1. Every pair returned valid JSON with all four fields and a label of 0 or 1. Retry any that didn't.
-2. Every excerpt other than `none` appears in its article. Normalise curly vs. straight
-   quotes on both sides before comparing.
+2. Every excerpt other than `none` appears in its article's title or body text. Normalise
+   curly vs. straight quotes on both sides before comparing.
 3. Review all `uncertain: true` pairs by hand, plus a random sample of about 50 others,
-   and report how often you agree with the LLM.
+   and report how often you agree with the LLM. Decisions go in `manual_labels.csv`;
+   see `docs/label_review.md`.
 4. Every query has at least one relevant article. A query with none is reported
    separately and left out of the averages (step 17).
