@@ -9,13 +9,17 @@ text is Porter-stemmed.
 ## Usage
 
 Requires Python 3.10+. The engine uses only the standard library. `ir_datasets` is
-needed for the Cranfield run and NumPy for the tests (`pip install -r requirements.txt`).
+needed for the Cranfield run, NumPy for the tests and matplotlib for the attack plots
+(`pip install -r requirements.txt`).
 
 ```
 python run_engine.py stats
 python run_cranfield.py
 python run_engine.py search "students union election commission" --k 10
 python run_engine.py evaluate --queries queries.json --qrels qrels.csv --out results/
+python run_epc.py
+python run_attacks.py
+python plot_attacks.py
 python -m unittest -v
 ```
 
@@ -39,9 +43,12 @@ irengine/
   data.py                       loaders for articles, queries and qrels
   cranfield.py                  Cranfield loading, binarization, split, CV folds, slope choice (steps 19-23)
   significance.py               paired randomization test
+  attacks.py                    attack targets, repetition / padding / combined edits, rescoring with IDF and pivot fixed
 run_engine.py                   command-line runner
 run_cranfield.py                Cranfield slope sweep and freeze (steps 19-24)
 run_epc.py                      main EPC evaluation: cosine vs pivoted, length groups, disagreements (steps 35-40)
+run_attacks.py                  attack experiments: 72 targets x 24 attacks x 2 methods, tables and CSVs
+plot_attacks.py                 attack figures, written to docs/figures/
 frozen_slope.json               the frozen slope s used for all EPC runs (step 24)
 check_labels.py                 checks results/llm_labels.jsonl and writes qrels.csv (step 27)
 qrels.csv                       EPC relevance judgments: query_id,document_id,relevance,source (step 27);
@@ -54,7 +61,9 @@ docs/cranfield.md               Cranfield decisions and results (steps 19-24)
 docs/changes.md                 changes after the first freeze: stemming, lnc.ltc, slope refrozen
 docs/label_review.md            manual review of the EPC labels: what was checked and changed (steps 30-33)
 docs/epc_evaluation.md          main EPC results (steps 35-40)
+docs/attacks.md                 attack experiments: design, results, findings
+docs/figures/                   attack figures (PNG and PDF)
 docs/pivoted_normalization_results.pdf  charts and tables of all results so far (PDF export of the results dashboard)
-tests/                          unit tests: toy example, metrics, preprocessing, Cranfield helpers,
+tests/                          unit tests: toy example, metrics, preprocessing, Cranfield helpers, attacks,
                                 NumPy cross-check
 ```
