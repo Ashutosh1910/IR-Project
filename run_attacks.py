@@ -1,19 +1,22 @@
 """Attack experiments: keyword repetition, unrelated padding and both combined.
 
-  python run_attacks.py [--out results/attacks]
+  python run_attacks.py [--queries main|extended] [--out DIR]
 
-1. Check the frozen labels (as run_epc.py does) and read the frozen slope.
+1. Check the frozen labels (as run_epc.py does) and read the frozen slope. With
+   --queries extended the run covers Q1-Q40, including the queries with no relevant
+   article; those have no AP or P@10, so their trials record the rank change and
+   success only, and they are left out of MAP (step 17).
 2. Select the targets once, for both methods: per query, 2 non-relevant articles from
    each length group that rank outside the top 10 under cosine and under pivoted
-   (seed 15). 12 queries x 6 = 72 targets.
+   (seed 15). 6 targets per query: 72 for Q1-Q12, 240 for Q1-Q40.
 3. Apply the 24 attacks to each target, one edited document per trial: repetition
    x5/10/25/50, padding 25/50/100/200% of the body word count, and the full 4 x 4
    combined grid. IDF, N and the pivot stay at their clean values; only the edited
    article's weights and norm are recomputed (irengine/attacks.py).
 4. For every trial and method, record the words added, the target's rank change,
    whether it entered the top 10, and the change in AP and P@10 for the attacked
-   query and in MAP over all 12 queries (the edited article stays in the collection,
-   labelled non-relevant, for every query).
+   query and in MAP over the queries that have a relevant article (the edited article
+   stays in the collection, labelled non-relevant, for every query).
 5. Print tables by attack level, by length group and by query, and write
    results/attacks/{targets, trials, levels, by_group, by_query}.csv and summary.json.
 
@@ -47,9 +50,9 @@ from irengine.attacks import (
     select_targets,
     split_sentences,
 )
-from irengine.data import index_documents, load_articles, load_qrels, load_queries
+from irengine.data import index_documents, load_articles
 from irengine.metrics import evaluate
-from run_epc import length_groups, load_frozen_labels
+from run_epc import LABEL_SETS, length_groups, load_query_set
 
 ROOT = Path(__file__).resolve().parent
 K = 10
@@ -58,8 +61,20 @@ METHODS = ("cosine", "pivoted")
 
 
 def mean(xs):
-    xs = list(xs)
+    """Mean of the values that are not None (None if there are none)."""
+    xs = [x for x in xs if x is not None]
     return sum(xs) / len(xs) if xs else None
+
+
+def quality(clean, attacked):
+    """AP and P@10 of the attacked query before and after the edit; None for a query
+    with no relevant article, which has neither (step 17)."""
+    if clean is None:
+        return {k: None for k in ("ap_clean", "ap_attacked", "d_ap", "p10_clean", "p10_attacked", "d_p10")}
+    return {"ap_clean": clean.average_precision, "ap_attacked": attacked.average_precision,
+            "d_ap": attacked.average_precision - clean.average_precision,
+            "p10_clean": clean.precision, "p10_attacked": attacked.precision,
+            "d_p10": attacked.precision - clean.precision}
 
 
 def aggregate(rows):
@@ -122,10 +137,12 @@ def write_csv(path, rows):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--out", default=ROOT / "results" / "attacks")
+    parser.add_argument("--queries", choices=sorted(LABEL_SETS), default="main",
+                        help="main: Q1-Q12; extended: Q1-Q40 (adds queries_extended.json)")
+    parser.add_argument("--out", default=None,
+                        help="default results/attacks (main) or results/attacks_extended (extended)")
     args = parser.parse_args(argv)
 
-    qrels_path, label_record = load_frozen_labels()
     s = float(json.loads((ROOT / "frozen_slope.json").read_text(encoding="utf-8"))["s"])
     slopes = {"cosine": None, "pivoted": s}
 
@@ -134,8 +151,8 @@ def main(argv=None):
     words = {d: int(a["word_count"]) for d, a in by_id.items()}
     texts = dict(index_documents(articles))
     index = InvertedIndex(index_documents(articles))
-    queries = load_queries(ROOT / "queries.json")
-    qrels = load_qrels(qrels_path, known_doc_ids=set(index.doc_ids))
+    queries, qrels, labels = load_query_set(args.queries, set(index.doc_ids))
+    empty = [q for q in queries if not qrels[q]]
     group, _ = length_groups(articles)
     unretrieved = index.N + 1
 
@@ -148,8 +165,9 @@ def main(argv=None):
                   for m in METHODS}
     clean_q = {m: {x.query_id: x for x in ev.per_query} for m, ev in clean_eval.items()}
     clean_map = {m: ev.map for m, ev in clean_eval.items()}
-    print(f"EPC: {index.N} articles, {len(queries)} queries, labels {qrels_path.name} "
-          f"(frozen {label_record['frozen_on']}), pivot p = {index.pivot:.6f} (fixed), s = {s:g}")
+    print(f"EPC: {index.N} articles, {len(queries)} queries ({len(empty)} with no relevant article), labels "
+          + ", ".join(f"{x['file']} (frozen {x['frozen_on']})" for x in labels)
+          + f", pivot p = {index.pivot:.6f} (fixed), s = {s:g}")
     print(f"Clean MAP: cosine {clean_map['cosine']:.4f}, pivoted {clean_map['pivoted']:.4f}")
 
     # Targets
@@ -196,14 +214,12 @@ def main(argv=None):
                     "old_rank": old_rank, "new_rank": new_rank, "rank_change": old_rank - new_rank,
                     "started_unretrieved": int(old_rank == unretrieved),
                     "success": int(new_rank <= K),
-                    "ap_clean": clean_q[m][q].average_precision, "ap_attacked": att_q[q].average_precision,
-                    "d_ap": att_q[q].average_precision - clean_q[m][q].average_precision,
-                    "p10_clean": clean_q[m][q].precision, "p10_attacked": att_q[q].precision,
-                    "d_p10": att_q[q].precision - clean_q[m][q].precision,
+                    "query_has_relevant": int(q in att_q),
+                    **quality(clean_q[m].get(q), att_q.get(q)),
                     "map_clean": clean_map[m], "map_attacked": ev.map, "d_map": ev.map - clean_map[m],
                     "other_queries_ap_changed": sum(
                         att_q[q2].average_precision != clean_q[m][q2].average_precision
-                        for q2 in queries if q2 != q),
+                        for q2 in att_q if q2 != q),
                 })
 
     def select(m, **conds):
@@ -290,6 +306,29 @@ def main(argv=None):
             f"{lv(a, 'cosine', 'median_rank_change', query_rows, query_id=q):>7.1f}/"
             f"{lv(a, 'pivoted', 'median_rank_change', query_rows, query_id=q):<6.1f}" for a in pads))
 
+    # Queries with a relevant article vs queries without one
+    type_rows = []
+    if empty:
+        for attack in grid:
+            for m in METHODS:
+                for has in (1, 0):
+                    sel = [r for r in select(m, attack=attack.label) if r["query_has_relevant"] == has]
+                    type_rows.append({"attack": attack.label, "kind": attack.kind, "method": m,
+                                      "query_has_relevant": has, **aggregate(sel)})
+        n_with = PER_GROUP * len(GROUPS) * (len(queries) - len(empty))
+        n_without = PER_GROUP * len(GROUPS) * len(empty)
+        print(f"\nBy query type: with a relevant article ({n_with} targets) vs without one ({n_without}); "
+              "success % c/p, and median drank c/p for padding")
+        print(f"  {'attack':<24}{'with relevant':>18}{'no relevant':>18}")
+        for a in reps + diag:
+            print(f"  {a:<24}" + "".join(
+                f"{lv(a, 'cosine', 'success_pct', type_rows, query_has_relevant=h):>11.1f}/"
+                f"{lv(a, 'pivoted', 'success_pct', type_rows, query_has_relevant=h):<6.1f}" for h in (1, 0)))
+        for a in pads:
+            print(f"  {a:<24}" + "".join(
+                f"{lv(a, 'cosine', 'median_rank_change', type_rows, query_has_relevant=h):>11.1f}/"
+                f"{lv(a, 'pivoted', 'median_rank_change', type_rows, query_has_relevant=h):<6.1f}" for h in (1, 0)))
+
     # Per target over the 16 combined cells (the cells reuse the same targets, so the
     # target is the unit of the test, not the trial)
     cells = {}
@@ -313,15 +352,17 @@ def main(argv=None):
     print(f"\nCheck: padding-only trials that entered the top 10: {pad_success}; "
           f"that raised the target's score: {pad_raised} (both must be 0)")
 
-    out = Path(args.out)
+    out = Path(args.out or ROOT / "results" / ("attacks" if args.queries == "main" else "attacks_extended"))
     out.mkdir(parents=True, exist_ok=True)
     write_csv(out / "targets.csv", target_rows)
     write_csv(out / "trials.csv", rows)
     write_csv(out / "levels.csv", level_rows)
     write_csv(out / "by_group.csv", group_rows)
     write_csv(out / "by_query.csv", query_rows)
+    if type_rows:
+        write_csv(out / "by_query_type.csv", type_rows)
     summary = {
-        "labels": {"file": qrels_path.name, "sha256": label_record["sha256"]},
+        "query_set": args.queries, "labels": labels, "queries_without_relevant": empty,
         "slope": s, "pivot_fixed": index.pivot, "k": K, "seed": SEED, "unretrieved_rank": unretrieved,
         "targets": {"total": len(target_rows), "per_group_per_query": PER_GROUP,
                     "not_retrieved_before_attack": n_unret},
@@ -335,11 +376,12 @@ def main(argv=None):
         "levels": level_rows,
         "combined_success_pct": combined_grid,
         "combined_per_target": per_target,
+        "by_query_type": type_rows,
         "checks": {"padding_successes": pad_success, "padding_raised_score": pad_raised},
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(f"\nwrote {out}/targets.csv, trials.csv ({len(rows)} rows), levels.csv, by_group.csv, "
-          f"by_query.csv, summary.json")
+          f"by_query.csv{', by_query_type.csv' if type_rows else ''}, summary.json")
     if pad_success or pad_raised:
         sys.exit("padding alone changed a target for the better: check the attack code")
 
